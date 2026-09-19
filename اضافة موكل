@@ -1,0 +1,155 @@
+# خطة تنفيذ التعديلات (إدارة المكاتب، فريق العمل، وحسابات الموكلين)
+
+بناءً على طلبك، قمنا بترتيب التعديلات لضمان توافق "المكتب" و "الفريق" (حيث أنهما يمثلان نفس الكيان)، وتخصيص إنشاء المستخدمين ليرثوا `office_id` الخاص بالمنشئ، بالإضافة إلى دعم دخول "الموكل" (Client) لمعاينة دعاويه ومواعيد جلساته. 
+
+لأنك ستقوم بعمل `Drop` لكل الجداول، قمنا بوضع التعديلات المطلوبة على الـ Database Schema، بالإضافة لخلاصة واجهات الـ REST API (الـ Endpoints) التي سيتم تعديلها أو إضافتها.
+
+## 1. التعديلات على قاعدة البيانات (Database Schema)
+
+### جدول المستخدمين (`users`)
+سيتم تعديل الـ Roles لتتضمن دور الموكل `CLIENT`، وسيتم ربط كل موكل والمحامي بمكتب `office_id`.
+```php
+$table->foreignId('office_id')->nullable()->constrained('offices')->nullOnDelete();
+$table->enum('role', ['MANAGER', 'EDITOR', 'VIEWER', 'LAWYER', 'CLIENT'])->default('LAWYER');
+```
+
+### جدول الموكلين (`clients`)
+سنضيف حقل `client_user_id` الذي سيربط بيانات الموكل بحساب الدخول الخاص به (من جدول users)، بينما يبقى `user_id` ليدل على المحامي الذي أضافه.
+```php
+$table->foreignId('user_id')->constrained('users'); // المحامي المنشئ
+$table->foreignId('client_user_id')->nullable()->constrained('users')->nullOnDelete(); // حساب الدخول للموكل
+```
+
+---
+
+## 2. الواجهات التي ستتغير (APIs)
+
+### أ. إنشاء موظف جديد في الفريق (Team / Office)
+الرابط سيبقى كما هو، لكن في الخلفية سيأخذ المستخدم الجديد نفس الـ `office_id` الخاص بالمحامي الذي قام بالإنشاء.
+- **URL**: `POST /api/team`
+- **Request Body**:
+```json
+{
+  "name": "أحمد المحامي",
+  "email": "ahmad@office.com",
+  "password": "password123",
+  "role": "LAWYER" // MANAGER, EDITOR, VIEWER, LAWYER
+}
+```
+- **Response** (201 Created):
+```json
+{
+  "status": "success",
+  "message": "Team member added successfully",
+  "data": {
+    "id": 5,
+    "name": "أحمد المحامي",
+    "email": "ahmad@office.com",
+    "role": "LAWYER",
+    "office_id": 1
+  }
+}
+```
+
+### ب. إنشاء موكل جديد + إعطاؤه حساب دخول
+تم تعديل الـ Endpoint الخاص بإنشاء موكل ليقبل `password` حتى يتمكن النظام من إنشاء حساب `User` له بدور `CLIENT` آلياً ويحصل الموكل على صلاحية الدخول.
+- **URL**: `POST /api/clients`
+- **Request Body**:
+```json
+{
+  "name": "خالد الموكل",
+  "phone": "0500000000",
+  "email": "khaled@client.com",
+  "password": "password123", // جديد: لإنشاء حساب للموكل
+  "address": "الرياض",
+  "notes": "لا يوجد"
+}
+```
+- **Response** (201 Created):
+```json
+{
+  "status": "success",
+  "message": "Client account and profile created successfully",
+  "data": {
+    "id": 12,
+    "user_id": 1, // المحامي الذي أضافه
+    "client_user_id": 6, // الآي دي الخاص بحساب تسجيل الدخول للموكل
+    "name": "خالد الموكل",
+    "email": "khaled@client.com",
+    "phone": "0500000000",
+    "address": "الرياض"
+  }
+}
+```
+
+### ج. تسجيل دخول الموكل (أو المحامي)
+نفس الـ Endpoint المستخدم حالياً، ولكن سيُرجع Role مختلفة ليتمكن التطبيق من توجيه المستخدم.
+- **URL**: `POST /api/login`
+- **Request Body**:
+```json
+{
+  "email": "khaled@client.com",
+  "password": "password123"
+}
+```
+- **Response** (200 OK):
+```json
+{
+  "status": "success",
+  "message": "Login successful",
+  "user": {
+    "id": 6,
+    "name": "خالد الموكل",
+    "email": "khaled@client.com",
+    "role": "CLIENT",
+    "office_id": 1 
+  },
+  "authorization": {
+    "token": "eyJhbG...",
+    "type": "bearer"
+  }
+}
+```
+
+### د. عرض دعاوى الموكل وجلساتها (خاص بحساب الموكل)
+سيتم إضافة Endpoint جديد مُخصص للموكلين فقط (`role = CLIENT`) ليتمكنوا من تصفح قضاياهم ومواعيد جلساتها بأنفسهم.
+- **URL**: `GET /api/client-portal/cases`
+- **Request Headers**: `Authorization: Bearer {token}`
+- **Response** (200 OK):
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": 3,
+      "case_number": "1055-2026",
+      "case_type": "تجارية",
+      "court": "المحكمة التجارية",
+      "status": "open",
+      "sessions": [
+        {
+          "id": 1,
+          "session_date": "2026-05-15 10:00:00",
+          "session_title": "الجلسة الأولى",
+          "decision": null
+        }
+      ]
+    }
+  ]
+}
+```
+
+## التغييرات الجوهرية على مستوى الشفرة (Backend Controllers):
+1. **الوصول المشترك (Office / Team):** في كل الـ Controllers الخاصة بالمهام والمحاضر والدعاوى، سنقوم بتغيير قيد البحث من `where('user_id', Auth::id())` ليصبح مرتبطاً بالمكتب:
+   ```php
+   // قديماً
+   CaseFile::where('user_id', Auth::id())->get();
+   // التعديل الجديد لجميع أعضاء الفريق والمكتب
+   CaseFile::whereHas('lawyer', function($q){
+       $q->where('office_id', Auth::user()->office_id);
+   })->get();
+   ```
+2. **صلاحيات القراءة والكتابة:** ستنحل ببساطة ببرمجة Middleware أو بداخل الـ FormRequests للتأكد من Role المستخدم (`MANAGER`, `EDITOR`, `VIEWER`) قبل السماح له بالإضافة أو التعديل على ملفات الدعاوى، بينما الـ `VIEWER` يمكنه القراءة فقط (GET).
+
+> [!IMPORTANT]
+> **مطلوب رأيك:** هل تريد أن نُفعّل تسجيل الدخول بشكل إجباري لجميع الموكلين الجدد (يصبح الـ `password` حقلاً مطلوباً في POST /api/clients)؟ أم يكون اختيارياً في حال أدخل المحامي كلمة مرور للموكل يتم إنشاء الحساب له؟
