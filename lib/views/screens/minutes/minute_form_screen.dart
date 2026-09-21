@@ -53,6 +53,9 @@ class _MinuteFormScreenState extends State<MinuteFormScreen> {
     } else if (args?['caseId'] != null) {
       _selectedCaseId = args!['caseId'] as int;
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Get.find<FileController>().fetchFiles();
+    });
   }
 
   @override

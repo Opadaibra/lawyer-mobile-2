@@ -193,7 +193,7 @@ class MinuteController extends GetxController {
       if (Get.isRegistered<DashboardController>()) {
         Get.find<DashboardController>().refreshDashboard();
       }
-      _showSuccess('تم حذف الضبط');
+      _showSuccess('moved_to_recycle_bin'.tr);
       return true;
     } catch (e) {
       _showError(e);

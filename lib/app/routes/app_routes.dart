@@ -7,6 +7,7 @@ class AppRoutes {
   static const String mainNav = '/main-nav';
   static const String starred = '/starred';
   static const String archive = '/archive';
+  static const String recycleBin = '/recycle-bin';
 
   // Clients
   static const String clients = '/clients';

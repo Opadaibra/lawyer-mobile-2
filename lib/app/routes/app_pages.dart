@@ -5,6 +5,7 @@ import '../../views/screens/auth/forgot_password_screen.dart';
 import '../../views/screens/dashboard_screen.dart';
 import '../../views/screens/main_navigation_screen.dart';
 import '../../views/screens/archive_screen.dart';
+import '../../views/screens/recycle_bin/recycle_bin_screen.dart';
 import '../../views/screens/clients/clients_screen.dart';
 import '../../views/screens/clients/client_detail_screen.dart';
 import '../../views/screens/clients/client_form_screen.dart';
@@ -74,6 +75,7 @@ class AppPages {
     GetPage(name: AppRoutes.search, page: () => const SearchScreen()),
     GetPage(name: AppRoutes.profile, page: () => const ProfileScreen()),
     GetPage(name: AppRoutes.archive, page: () => const ArchiveScreen()),
+    GetPage(name: AppRoutes.recycleBin, page: () => const RecycleBinScreen()),
     GetPage(name: AppRoutes.team, page: () => const TeamScreen()),
     GetPage(name: AppRoutes.officeInfo, page: () => const OfficeInfoScreen()),
     GetPage(name: AppRoutes.clientPortal, page: () => const ClientPortalScreen()),

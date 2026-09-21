@@ -58,6 +58,9 @@ class _CaseFormScreenState extends State<CaseFormScreen> {
     } else {
       _feesCtrl.text = '—';
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Get.find<FileController>().fetchFiles();
+    });
   }
 
   Future<void> _loadFeesFromApi() async {

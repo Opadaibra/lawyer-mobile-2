@@ -59,6 +59,10 @@ class _FilesScreenState extends State<FilesScreen> {
     return fields;
   }
 
+  bool get _isScoped => caseId != null || minuteId != null || taskId != null;
+
+  bool get _allowMultiUpload => caseId != null;
+
   void _showUploadOptions(BuildContext context, bool canMutate) async {
     if (!canMutate) return;
 
@@ -111,7 +115,7 @@ class _FilesScreenState extends State<FilesScreen> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            Text('اختيار مصدر الملف',
+            Text(_allowMultiUpload ? 'اختيار مصدر الملفات' : 'اختيار مصدر الملف',
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 24),
             Row(
@@ -133,17 +137,23 @@ class _FilesScreenState extends State<FilesScreen> {
                   color: Colors.purple,
                   onTap: () async {
                     Get.back();
-                    final success = await fileCtrl.pickAndUploadFromGallery(extraFields: fields);
+                    final success = await fileCtrl.pickAndUploadFromGallery(
+                      extraFields: fields,
+                      allowMultiple: _allowMultiUpload,
+                    );
                     if (success) _loadFiles();
                   },
                 ),
                 _UploadOptionTile(
                   icon: Icons.attach_file_outlined,
-                  label: 'ملف',
+                  label: _allowMultiUpload ? 'ملفات' : 'ملف',
                   color: Colors.orange,
                   onTap: () async {
                     Get.back();
-                    final success = await fileCtrl.pickAndUpload(extraFields: fields);
+                    final success = await fileCtrl.pickAndUpload(
+                      extraFields: fields,
+                      allowMultiple: _allowMultiUpload,
+                    );
                     if (success) _loadFiles();
                   },
                 ),
@@ -162,8 +172,14 @@ class _FilesScreenState extends State<FilesScreen> {
 
     return Scaffold(
       appBar: CustomAppBar(
-        title: 'الملفات',
-        showBack: false,
+        title: caseId != null
+            ? 'ملفات القضية'
+            : minuteId != null
+                ? 'ملفات المحضر'
+                : taskId != null
+                    ? 'ملفات المهمة'
+                    : 'الملفات',
+        showBack: _isScoped,
       ),
       body: Obx(() {
         if (fileCtrl.isLoading.value) return const LoadingWidget();
@@ -176,7 +192,7 @@ class _FilesScreenState extends State<FilesScreen> {
             onAction: canMutate
                 ? () => _showUploadOptions(context, canMutate)
                 : null,
-            actionLabel: 'رفع ملف',
+            actionLabel: _allowMultiUpload ? 'رفع ملفات' : 'رفع ملف',
           );
         }
 
@@ -331,7 +347,9 @@ class _FilesScreenState extends State<FilesScreen> {
                   child: CircularProgressIndicator(
                       color: Colors.white, strokeWidth: 2))
               : const Icon(Icons.upload_file_outlined),
-          label: Text(fileCtrl.isUploading.value ? 'جاري الرفع' : 'رفع ملف'),
+          label: Text(fileCtrl.isUploading.value
+              ? 'جاري الرفع'
+              : (_allowMultiUpload ? 'رفع ملفات' : 'رفع ملف')),
         );
       }),
     );

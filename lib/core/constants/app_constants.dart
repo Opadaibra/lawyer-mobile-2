@@ -1,8 +1,8 @@
 // App constants
 class AppConstants {
-  // static const String baseUrl =
-  // 'https://unliberalised-maximumly-brittanie.ngrok-free.dev/api';
-  static const String baseUrl = 'https://lawyer-server.online/api';
+  static const String baseUrl =
+  'https://unliberalised-maximumly-brittanie.ngrok-free.dev/api';
+  // static const String baseUrl = 'https://lawyer-server.online/api';
 
   // Auth endpoints
   static const String login = '/login';

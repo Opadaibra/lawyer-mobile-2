@@ -20,7 +20,8 @@ class FileController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    fetchFiles();
+    // Do not fetch all files here — scoped screens (case/minute/task)
+    // would race with fetchFiles() and briefly/permanently show every file.
     fetchFileTypes();
   }
 
@@ -49,6 +50,7 @@ class FileController extends GetxController {
 
   Future<void> fetchFilesByCase(int caseId) async {
     isLoading.value = true;
+    files.clear();
     try {
       final response = await _api.getList('/files/by-case/$caseId');
       final list = _parseList(response);
@@ -62,6 +64,7 @@ class FileController extends GetxController {
 
   Future<void> fetchFilesByMinute(int minuteId) async {
     isLoading.value = true;
+    files.clear();
     try {
       final response = await _api.getList('/files/by-minute/$minuteId');
       final list = _parseList(response);
@@ -75,6 +78,7 @@ class FileController extends GetxController {
 
   Future<void> fetchFilesByTask(int taskId) async {
     isLoading.value = true;
+    files.clear();
     try {
       final response = await _api.getList('/files/by-task/$taskId');
       final list = _parseList(response);
@@ -88,37 +92,44 @@ class FileController extends GetxController {
 
   Future<bool> pickAndUpload({
     Map<String, String>? extraFields,
+    bool allowMultiple = false,
   }) async {
     try {
       final result = await FilePicker.platform.pickFiles(
-        allowMultiple: false,
+        allowMultiple: allowMultiple,
         type: FileType.any,
       );
 
       if (result == null || result.files.isEmpty) return false;
 
-      final file = result.files.first;
-      if (file.path == null) {
-        _showError(Exception('No file path available'));
-        return false;
-      }
-
-      final customName = await _askForFileName(file.name);
-      if (customName == null) return false;
-
       isUploading.value = true;
-      final response = await _api.uploadFile(
-        filePath: file.path!,
-        fileName: customName,
-        fields: extraFields,
-      );
+      var anySuccess = false;
 
-      final data = (response['data'] as Map<String, dynamic>?) ?? response;
-      if (data.isNotEmpty) {
-        files.insert(0, FileModel.fromJson(data));
+      for (final file in result.files) {
+        if (file.path == null) continue;
+
+        final customName = await _askForFileName(file.name);
+        if (customName == null) continue;
+
+        final response = await _api.uploadFile(
+          filePath: file.path!,
+          fileName: customName,
+          fields: extraFields,
+        );
+
+        final parsed = _parseUploadResponse(response);
+        for (final item in parsed) {
+          files.insert(0, item);
+        }
+        anySuccess = true;
       }
-      _showSuccess('File uploaded / تم رفع الملف');
-      return true;
+
+      if (anySuccess) {
+        _showSuccess(allowMultiple
+            ? 'Files uploaded / تم رفع الملفات'
+            : 'File uploaded / تم رفع الملف');
+      }
+      return anySuccess;
     } catch (e) {
       _showError(e);
       return false;
@@ -149,9 +160,9 @@ class FileController extends GetxController {
         fields: extraFields,
       );
 
-      final data = (response['data'] as Map<String, dynamic>?) ?? response;
-      if (data.isNotEmpty) {
-        files.insert(0, FileModel.fromJson(data));
+      final parsed = _parseUploadResponse(response);
+      for (final item in parsed) {
+        files.insert(0, item);
       }
       _showSuccess('تم رفع الصورة بنجاح');
       return true;
@@ -166,8 +177,36 @@ class FileController extends GetxController {
   /// Pick an image from the gallery and upload it
   Future<bool> pickAndUploadFromGallery({
     Map<String, String>? extraFields,
+    bool allowMultiple = false,
   }) async {
     try {
+      if (allowMultiple) {
+        final List<XFile> photos = await _imagePicker.pickMultiImage(
+          imageQuality: 85,
+        );
+        if (photos.isEmpty) return false;
+
+        isUploading.value = true;
+        var anySuccess = false;
+        for (final photo in photos) {
+          final customName = await _askForFileName(photo.name);
+          if (customName == null) continue;
+
+          final response = await _api.uploadFile(
+            filePath: photo.path,
+            fileName: customName,
+            fields: extraFields,
+          );
+          final parsed = _parseUploadResponse(response);
+          for (final item in parsed) {
+            files.insert(0, item);
+          }
+          anySuccess = true;
+        }
+        if (anySuccess) _showSuccess('تم رفع الصور بنجاح');
+        return anySuccess;
+      }
+
       final XFile? photo = await _imagePicker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 85,
@@ -185,9 +224,9 @@ class FileController extends GetxController {
         fields: extraFields,
       );
 
-      final data = (response['data'] as Map<String, dynamic>?) ?? response;
-      if (data.isNotEmpty) {
-        files.insert(0, FileModel.fromJson(data));
+      final parsed = _parseUploadResponse(response);
+      for (final item in parsed) {
+        files.insert(0, item);
       }
       _showSuccess('تم رفع الصورة بنجاح');
       return true;
@@ -203,7 +242,7 @@ class FileController extends GetxController {
     try {
       await _api.delete('${AppConstants.files}/$id');
       files.removeWhere((f) => f.id == id);
-      _showSuccess('File deleted / تم حذف الملف');
+      _showSuccess('moved_to_recycle_bin'.tr);
       return true;
     } catch (e) {
       _showError(e);
@@ -216,8 +255,10 @@ class FileController extends GetxController {
       final response = await _api.put('${AppConstants.files}/$id', data: {
         'file_type_id': fileTypeId,
       });
-      final data = (response['data'] as Map<String, dynamic>?) ?? response;
-      if (data.isNotEmpty) {
+      final data = (response['data'] as Map<String, dynamic>?) ??
+          (response['file'] as Map<String, dynamic>?) ??
+          response;
+      if (data.isNotEmpty && data.containsKey('id')) {
         final updatedFile = FileModel.fromJson(data);
         final index = files.indexWhere((f) => f.id == id);
         if (index != -1) {
@@ -259,6 +300,36 @@ class FileController extends GetxController {
     );
 
     return confirmed ? newName : null;
+  }
+
+  List<FileModel> _parseUploadResponse(Map<String, dynamic> response) {
+    final result = <FileModel>[];
+    final data = response['data'];
+    if (data is List) {
+      for (final e in data) {
+        if (e is Map) {
+          result.add(FileModel.fromJson(Map<String, dynamic>.from(e)));
+        }
+      }
+      return result;
+    }
+    if (data is Map) {
+      result.add(FileModel.fromJson(Map<String, dynamic>.from(data)));
+      return result;
+    }
+    if (response['files'] is List) {
+      for (final e in response['files'] as List) {
+        if (e is Map) {
+          result.add(FileModel.fromJson(Map<String, dynamic>.from(e)));
+        }
+      }
+      return result;
+    }
+    if (response['file'] is Map) {
+      result.add(
+          FileModel.fromJson(Map<String, dynamic>.from(response['file'])));
+    }
+    return result;
   }
 
   List<dynamic> _parseList(dynamic response) {

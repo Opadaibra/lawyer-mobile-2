@@ -7,8 +7,6 @@ import 'dashboard_screen.dart';
 import 'cases/cases_screen.dart';
 import 'minutes/minutes_screen.dart';
 import 'clients/clients_screen.dart';
-import '../../data/services/storage_service.dart';
-import '../../data/services/offline_sync_service.dart';
 import '../../controllers/dashboard_controller.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -126,6 +124,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           icon: const Icon(Icons.archive_outlined),
           tooltip: 'archive'.tr,
           onPressed: () => Get.toNamed(AppRoutes.archive),
+        ),
+        IconButton(
+          icon: const Icon(Icons.delete_outline),
+          tooltip: 'recycle_bin'.tr,
+          onPressed: () => Get.toNamed(AppRoutes.recycleBin),
         ),
         IconButton(
           icon: const Icon(Icons.notifications_none_outlined),
@@ -263,83 +266,98 @@ class AppDrawer extends StatelessWidget {
             accountName: Obx(() => Text(auth.userName)),
             accountEmail: Obx(() => Text(auth.userEmail)),
           ),
-          _DrawerTile(
-            icon: Icons.home_outlined, 
-            label: 'home'.tr, 
-            selected: currentIndex == 0,
-            onTap: () => onNavigate(0)
-          ),
-          _DrawerTile(
-            icon: Icons.task_outlined, 
-            label: 'tasks'.tr, 
-            onTap: () { 
-              Get.back(); 
-              Get.toNamed(AppRoutes.tasks); 
-            }
-          ),
-          _DrawerTile(
-            icon: Icons.folder_outlined, 
-            label: 'cases'.tr, 
-            selected: currentIndex == 1,
-            onTap: () => onNavigate(1)
-          ),
-          _DrawerTile(
-            icon: Icons.description_outlined, 
-            label: 'minutes'.tr, 
-            selected: currentIndex == 2,
-            onTap: () => onNavigate(2)
-          ),
-          _DrawerTile(
-            icon: Icons.people_outline, 
-            label: 'clients'.tr, 
-            selected: currentIndex == 3,
-            onTap: () => onNavigate(3)
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _DrawerTile(
+                  icon: Icons.home_outlined,
+                  label: 'home'.tr,
+                  selected: currentIndex == 0,
+                  onTap: () => onNavigate(0),
+                ),
+                _DrawerTile(
+                  icon: Icons.task_outlined,
+                  label: 'tasks'.tr,
+                  onTap: () {
+                    Get.back();
+                    Get.toNamed(AppRoutes.tasks);
+                  },
+                ),
+                _DrawerTile(
+                  icon: Icons.folder_outlined,
+                  label: 'cases'.tr,
+                  selected: currentIndex == 1,
+                  onTap: () => onNavigate(1),
+                ),
+                _DrawerTile(
+                  icon: Icons.description_outlined,
+                  label: 'minutes'.tr,
+                  selected: currentIndex == 2,
+                  onTap: () => onNavigate(2),
+                ),
+                _DrawerTile(
+                  icon: Icons.people_outline,
+                  label: 'clients'.tr,
+                  selected: currentIndex == 3,
+                  onTap: () => onNavigate(3),
+                ),
+                const Divider(),
+                _DrawerTile(
+                  icon: Icons.archive_outlined,
+                  label: 'archive'.tr,
+                  onTap: () {
+                    Get.back();
+                    Get.toNamed(AppRoutes.archive);
+                  },
+                ),
+                _DrawerTile(
+                  icon: Icons.delete_outline,
+                  label: 'recycle_bin'.tr,
+                  onTap: () {
+                    Get.back();
+                    Get.toNamed(AppRoutes.recycleBin);
+                  },
+                ),
+                _DrawerTile(
+                  icon: Icons.info_outline,
+                  label: 'about_office'.tr,
+                  onTap: () {
+                    Get.back();
+                    Get.toNamed(AppRoutes.aboutOffice);
+                  },
+                ),
+                const Divider(),
+                _DrawerTile(
+                  icon: Icons.attach_file,
+                  label: 'files'.tr,
+                  onTap: () {
+                    Get.back();
+                    Get.toNamed(AppRoutes.files);
+                  },
+                ),
+                const Divider(),
+                _DrawerTile(
+                  icon: Icons.sync,
+                  label: 'المزامنة (رفع البيانات)'.tr,
+                  onTap: () {
+                    Get.back();
+                    Get.toNamed(AppRoutes.syncData);
+                  },
+                ),
+              ],
+            ),
           ),
           const Divider(),
           _DrawerTile(
-            icon: Icons.archive_outlined, 
-            label: 'archive'.tr, 
-            onTap: () { 
-              Get.back(); 
-              Get.toNamed(AppRoutes.archive); 
-            }
-          ),
-          _DrawerTile(
-            icon: Icons.info_outline, 
-            label: 'about_office'.tr, 
-            onTap: () { 
-              Get.back(); 
-              Get.toNamed(AppRoutes.aboutOffice); 
-            }
-          ),
-          const Divider(),
-          _DrawerTile(
-            icon: Icons.attach_file, 
-            label: 'files'.tr, 
-            onTap: () { 
-              Get.back(); 
-              Get.toNamed(AppRoutes.files); 
-            }
-          ),
-          const Divider(),
-          _DrawerTile(
-            icon: Icons.sync, 
-            label: 'المزامنة (رفع البيانات)'.tr, 
-            onTap: () { 
-              Get.back(); 
-              Get.toNamed(AppRoutes.syncData); 
-            }
-          ),
-          const Spacer(),
-          const Divider(),
-          _DrawerTile(
-            icon: Icons.logout, 
-            label: 'logout'.tr, 
+            icon: Icons.logout,
+            label: 'logout'.tr,
             onTap: () {
-              Get.back(); // close drawer
+              Get.back();
               Get.dialog(AlertDialog(
                 title: Text('logout'.tr),
-                content: const Text('سيتم تسجيل الخروج. انتبه: أي بيانات لم يتم مزامنتها مسبقاً قد يتم فقدانها.'),
+                content: const Text(
+                    'سيتم تسجيل الخروج. انتبه: أي بيانات لم يتم مزامنتها مسبقاً قد يتم فقدانها.'),
                 actions: [
                   TextButton(onPressed: Get.back, child: Text('cancel'.tr)),
                   ElevatedButton(
@@ -352,7 +370,7 @@ class AppDrawer extends StatelessWidget {
                   ),
                 ],
               ));
-            }
+            },
           ),
           const SizedBox(height: 16),
         ],
