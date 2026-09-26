@@ -121,6 +121,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       title: Text('home'.tr),
       actions: [
         IconButton(
+          icon: const Icon(Icons.search),
+          tooltip: 'بحث',
+          onPressed: () => Get.toNamed(AppRoutes.search),
+        ),
+        IconButton(
           icon: const Icon(Icons.archive_outlined),
           tooltip: 'archive'.tr,
           onPressed: () => Get.toNamed(AppRoutes.archive),
@@ -158,6 +163,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       ],
     );
   }
+
 
   void _showChangePasswordDialog(BuildContext context, AuthController auth) {
     final currentPass = TextEditingController();
